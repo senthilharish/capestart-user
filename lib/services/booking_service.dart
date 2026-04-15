@@ -4,6 +4,14 @@ import '../models/booking_model.dart';
 class BookingService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  List<BookingModel> _sortBookingsByBookedAt(List<BookingModel> bookings) {
+    final sortedBookings = List<BookingModel>.from(bookings);
+    sortedBookings.sort(
+      (first, second) => second.bookedAt.compareTo(first.bookedAt),
+    );
+    return sortedBookings;
+  }
+
   // Create a new booking
   Future<BookingModel> createBooking(BookingModel booking) async {
     try {
@@ -37,12 +45,13 @@ class BookingService {
       final snapshot = await _firestore
           .collection('bookings')
           .where('userId', isEqualTo: userId)
-          .orderBy('bookedAt', descending: true)
           .get();
 
-      return snapshot.docs
+      final bookings = snapshot.docs
           .map((doc) => BookingModel.fromJson(doc.data()))
           .toList();
+
+      return _sortBookingsByBookedAt(bookings);
     } catch (e) {
       throw Exception('Failed to fetch user bookings: $e');
     }
@@ -74,12 +83,13 @@ class BookingService {
           .collection('bookings')
           .where('userId', isEqualTo: userId)
           .where('status', isEqualTo: status)
-          .orderBy('bookedAt', descending: true)
           .get();
 
-      return snapshot.docs
+      final bookings = snapshot.docs
           .map((doc) => BookingModel.fromJson(doc.data()))
           .toList();
+
+      return _sortBookingsByBookedAt(bookings);
     } catch (e) {
       throw Exception('Failed to fetch bookings: $e');
     }
@@ -147,12 +157,13 @@ class BookingService {
       return _firestore
           .collection('bookings')
           .where('userId', isEqualTo: userId)
-          .orderBy('bookedAt', descending: true)
           .snapshots()
           .map((snapshot) {
-        return snapshot.docs
+        final bookings = snapshot.docs
             .map((doc) => BookingModel.fromJson(doc.data()))
             .toList();
+
+        return _sortBookingsByBookedAt(bookings);
       });
     } catch (e) {
       throw Exception('Failed to stream bookings: $e');

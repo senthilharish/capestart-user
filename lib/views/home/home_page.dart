@@ -129,6 +129,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  String selectedStatus = 'All';
+
   @override
   void initState() {
     super.initState();
@@ -180,6 +182,14 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         final rides = rideController.rides;
+        final filteredRides = rides.where((ride) {
+          if (selectedStatus == 'All') {
+            return true;
+          }
+
+          final rideStatus = _normalizeRideStatus(ride.status);
+          return rideStatus == selectedStatus.toLowerCase();
+        }).toList();
 
         if (rides.isEmpty) {
           return Center(
@@ -206,30 +216,57 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return ListView.builder(
           padding: const EdgeInsets.all(AppConstants.paddingMedium),
-          itemCount: rides.length + 1,
+          itemCount: filteredRides.length + 1,
           itemBuilder: (context, index) {
             if (index == 0) {
               return Container(
-                margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
+                margin:
+                    const EdgeInsets.only(bottom: AppConstants.paddingMedium),
                 padding: const EdgeInsets.all(AppConstants.paddingMedium),
                 decoration: BoxDecoration(
                   color: AppConstants.lightGrayColor,
                   borderRadius:
                       BorderRadius.circular(AppConstants.borderRadiusMedium),
                 ),
-                child: const Text(
-                  'Available Rides',
-                  style: TextStyle(
-                    fontSize: AppConstants.fontSizeLarge,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Available Rides',
+                      style: TextStyle(
+                        fontSize: AppConstants.fontSizeLarge,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        setState(() {
+                          selectedStatus = value;
+                        });
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(value: 'All', child: Text('All')),
+                        PopupMenuItem(
+                          value: 'Cancelled',
+                          child: Text('Cancelled'),
+                        ),
+                        PopupMenuItem(value: 'Started', child: Text('Started')),
+                        PopupMenuItem(
+                          value: 'Completed',
+                          child: Text('Completed'),
+                        ),
+                      ],
+                      icon: const Icon(Icons.filter_list),
+                    ),
+                  ],
                 ),
               );
             }
 
-            final ride = rides[index - 1];
-            final statusColor = _getStatusColor(ride.status);
-            final statusIcon = _getStatusIcon(ride.status);
+            final ride = filteredRides[index - 1];
+            final normalizedStatus = _normalizeRideStatus(ride.status);
+            final statusColor = _getStatusColor(normalizedStatus);
+            final statusIcon = _getStatusIcon(normalizedStatus);
 
             return Card(
               color: Colors.white,
@@ -272,7 +309,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          ride.status.replaceAll('_', ' ').toUpperCase(),
+                          normalizedStatus.toUpperCase(),
                           style: TextStyle(
                             fontSize: AppConstants.fontSizeSmall,
                             color: statusColor,
@@ -306,20 +343,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: Colors.grey.shade600,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Icon(
-                          Icons.schedule,
-                          size: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          ride.rideDuration ?? 'N/A',
-                          style: TextStyle(
-                            fontSize: AppConstants.fontSizeSmall,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
+                        const Spacer(),
                       ],
                     ),
                   ],
@@ -333,6 +357,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  String _normalizeRideStatus(String? status) {
+    final safeStatus = (status ?? '').toLowerCase();
+    if (safeStatus == 'in_progress') {
+      return 'started';
+    }
+    return safeStatus;
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -340,6 +372,8 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'accepted':
         return Colors.blue;
       case 'in_progress':
+        return Colors.blue;
+      case 'started':
         return Colors.blue;
       case 'completed':
         return Colors.green;
@@ -357,6 +391,8 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'accepted':
         return Icons.check_circle;
       case 'in_progress':
+        return Icons.directions_car;
+      case 'started':
         return Icons.directions_car;
       case 'completed':
         return Icons.done_all;
@@ -376,21 +412,39 @@ class MyRidesScreen extends StatefulWidget {
 }
 
 class _MyRidesScreenState extends State<MyRidesScreen> {
+  String? _loadedUserId;
+
   @override
   void initState() {
     super.initState();
-    // Fetch user's bookings when screen loads
+    // Fetch user's bookings when screen loads.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authController = context.read<AuthController>();
-      final currentUser = authController.currentUser;
-      if (currentUser != null) {
-        context.read<BookingController>().fetchUserBookings(currentUser.uid);
-      }
+      _loadBookingsIfNeeded();
     });
+  }
+
+  void _loadBookingsIfNeeded() {
+    final authController = context.read<AuthController>();
+    final currentUser = authController.currentUser;
+
+    if (currentUser == null || _loadedUserId == currentUser.uid) {
+      return;
+    }
+
+    _loadedUserId = currentUser.uid;
+    context.read<BookingController>().fetchUserBookings(currentUser.uid);
   }
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _loadBookingsIfNeeded();
+    });
+
     return Consumer2<AuthController, BookingController>(
       builder: (context, authController, bookingController, _) {
         final currentUser = authController.currentUser;
@@ -469,7 +523,8 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
           itemBuilder: (context, index) {
             if (index == 0) {
               return Container(
-                margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
+                margin:
+                    const EdgeInsets.only(bottom: AppConstants.paddingMedium),
                 padding: const EdgeInsets.all(AppConstants.paddingMedium),
                 decoration: BoxDecoration(
                   color: AppConstants.lightGrayColor,
@@ -540,8 +595,8 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
                         ),
                         if (booking.isApproved)
                           Padding(
-                            padding:
-                                const EdgeInsets.only(left: AppConstants.paddingSmall),
+                            padding: const EdgeInsets.only(
+                                left: AppConstants.paddingSmall),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
