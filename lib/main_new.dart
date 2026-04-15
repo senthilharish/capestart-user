@@ -23,7 +23,16 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthController()),
+        ChangeNotifierProvider(
+          create: (_) {
+            final controller = AuthController();
+            // Call checkCurrentUser ONCE after first frame (not in FutureBuilder!)
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              controller.checkCurrentUser();
+            });
+            return controller;
+          },
+        ),
       ],
       child: MaterialApp(
         title: 'CapeStart User',
@@ -31,26 +40,23 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         home: Consumer<AuthController>(
           builder: (context, authController, _) {
-            return FutureBuilder(
-              future: authController.checkCurrentUser(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Scaffold(
-                    body: Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AppConstants.primaryColor,
-                        ),
-                      ),
+            // Simple check: if loading, show splash screen
+            if (authController.isLoading) {
+              return const Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppConstants.primaryColor,
                     ),
-                  );
-                }
+                  ),
+                ),
+              );
+            }
 
-                return authController.isLoggedIn
-                    ? const HomePage()
-                    : const LoginPage();
-              },
-            );
+            // Otherwise, route to home or login based on login state
+            return authController.isLoggedIn
+                ? const HomePage()
+                : const LoginPage();
           },
         ),
         routes: {

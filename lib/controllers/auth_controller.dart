@@ -137,14 +137,18 @@ class AuthController extends ChangeNotifier {
 
   // Check current user
   Future<void> checkCurrentUser() async {
+    _isLoading = true;
+    notifyListeners();
     try {
       if (_authService.isUserLoggedIn()) {
         _currentUser = await _authService.getCurrentUser();
       }
     } catch (e) {
       _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   void _setLoading(bool value) {

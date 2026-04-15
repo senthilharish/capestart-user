@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/app_constants.dart';
 import '../../controllers/auth_controller.dart';
+import '../../controllers/ride_controller.dart';
+import '../../controllers/booking_controller.dart';
+import 'pages/ride_detail_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -118,102 +121,520 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final vehicles = [
-      'Bike - 2 min away',
-      'Auto - 4 min away',
-      'Cab - 6 min away'
-    ];
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(AppConstants.paddingMedium),
-      itemCount: vehicles.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Container(
-            margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
-            padding: const EdgeInsets.all(AppConstants.paddingMedium),
-            decoration: BoxDecoration(
-              color: AppConstants.lightGrayColor,
-              borderRadius:
-                  BorderRadius.circular(AppConstants.borderRadiusMedium),
-            ),
-            child: const Text(
-              'Nearby Vehicles',
-              style: TextStyle(
-                fontSize: AppConstants.fontSizeLarge,
-                fontWeight: FontWeight.bold,
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch all rides when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<RideController>().fetchAllRides();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<RideController>(
+      builder: (context, rideController, _) {
+        if (rideController.isLoading) {
+          return const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(
+                AppConstants.primaryColor,
               ),
             ),
           );
         }
 
-        return Card(
-          color: Colors.white,
-          child: ListTile(
-            leading: const Icon(
-              Icons.directions_car,
-              color: AppConstants.primaryColor,
+        if (rideController.errorMessage.isNotEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: AppConstants.errorColor,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Error: ${rideController.errorMessage}',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    rideController.fetchAllRides();
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
             ),
-            title: Text(vehicles[index - 1]),
-            subtitle: const Text('Tap to select ride option'),
-          ),
+          );
+        }
+
+        final rides = rideController.rides;
+
+        if (rides.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.directions_car,
+                  size: 64,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No rides available',
+                  style: TextStyle(
+                    fontSize: AppConstants.fontSizeLarge,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+          itemCount: rides.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
+                padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                decoration: BoxDecoration(
+                  color: AppConstants.lightGrayColor,
+                  borderRadius:
+                      BorderRadius.circular(AppConstants.borderRadiusMedium),
+                ),
+                child: const Text(
+                  'Available Rides',
+                  style: TextStyle(
+                    fontSize: AppConstants.fontSizeLarge,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              );
+            }
+
+            final ride = rides[index - 1];
+            final statusColor = _getStatusColor(ride.status);
+            final statusIcon = _getStatusIcon(ride.status);
+
+            return Card(
+              color: Colors.white,
+              margin: const EdgeInsets.symmetric(
+                vertical: AppConstants.paddingSmall,
+              ),
+              child: ListTile(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => RideDetailPage(
+                        rideId: ride.rideId,
+                      ),
+                    ),
+                  );
+                },
+                leading: Icon(
+                  Icons.directions_car,
+                  color: AppConstants.primaryColor,
+                ),
+                title: Text(
+                  '${ride.startAddress} → ${ride.destinationAddress}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          statusIcon,
+                          size: 14,
+                          color: statusColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          ride.status.replaceAll('_', ' ').toUpperCase(),
+                          style: TextStyle(
+                            fontSize: AppConstants.fontSizeSmall,
+                            color: statusColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (ride.distance != null)
+                          Text(
+                            ride.distance!,
+                            style: const TextStyle(
+                              fontSize: AppConstants.fontSizeSmall,
+                              color: AppConstants.textColor,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.currency_rupee,
+                          size: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '₹${ride.totalPrice.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: AppConstants.fontSizeSmall,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(
+                          Icons.schedule,
+                          size: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          ride.rideDuration ?? 'N/A',
+                          style: TextStyle(
+                            fontSize: AppConstants.fontSizeSmall,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                trailing: const Icon(Icons.chevron_right),
+              ),
+            );
+          },
         );
       },
     );
   }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange;
+      case 'accepted':
+        return Colors.blue;
+      case 'in_progress':
+        return Colors.blue;
+      case 'completed':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Icons.schedule;
+      case 'accepted':
+        return Icons.check_circle;
+      case 'in_progress':
+        return Icons.directions_car;
+      case 'completed':
+        return Icons.done_all;
+      case 'cancelled':
+        return Icons.cancel;
+      default:
+        return Icons.info;
+    }
+  }
 }
 
-class MyRidesScreen extends StatelessWidget {
+class MyRidesScreen extends StatefulWidget {
   const MyRidesScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final rides = [
-      'Office Drop - Today, 9:30 AM',
-      'Airport Ride - Yesterday, 7:10 PM'
-    ];
+  State<MyRidesScreen> createState() => _MyRidesScreenState();
+}
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(AppConstants.paddingMedium),
-      itemCount: rides.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Container(
-            margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
-            padding: const EdgeInsets.all(AppConstants.paddingMedium),
-            decoration: BoxDecoration(
-              color: AppConstants.lightGrayColor,
-              borderRadius:
-                  BorderRadius.circular(AppConstants.borderRadiusMedium),
-            ),
-            child: const Text(
-              'My Booked Rides',
-              style: TextStyle(
-                fontSize: AppConstants.fontSizeLarge,
-                fontWeight: FontWeight.bold,
+class _MyRidesScreenState extends State<MyRidesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch user's bookings when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authController = context.read<AuthController>();
+      final currentUser = authController.currentUser;
+      if (currentUser != null) {
+        context.read<BookingController>().fetchUserBookings(currentUser.uid);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer2<AuthController, BookingController>(
+      builder: (context, authController, bookingController, _) {
+        final currentUser = authController.currentUser;
+
+        if (currentUser == null) {
+          return const Center(
+            child: Text('Please log in to view your bookings'),
+          );
+        }
+
+        if (bookingController.isLoading) {
+          return const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(
+                AppConstants.primaryColor,
               ),
             ),
           );
         }
 
-        return Card(
-          color: Colors.white,
-          child: ListTile(
-            leading: const Icon(
-              Icons.history,
-              color: AppConstants.primaryColor,
+        if (bookingController.errorMessage.isNotEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: AppConstants.errorColor,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Error: ${bookingController.errorMessage}',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    bookingController.fetchUserBookings(currentUser.uid);
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
             ),
-            title: Text(rides[index - 1]),
-            subtitle: const Text('Ride completed'),
-          ),
+          );
+        }
+
+        final bookings = bookingController.bookings;
+
+        if (bookings.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.bookmark_outline,
+                  size: 64,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No booked rides yet',
+                  style: TextStyle(
+                    fontSize: AppConstants.fontSizeLarge,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
+          itemCount: bookings.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: AppConstants.paddingMedium),
+                padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                decoration: BoxDecoration(
+                  color: AppConstants.lightGrayColor,
+                  borderRadius:
+                      BorderRadius.circular(AppConstants.borderRadiusMedium),
+                ),
+                child: const Text(
+                  'My Booked Rides',
+                  style: TextStyle(
+                    fontSize: AppConstants.fontSizeLarge,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              );
+            }
+
+            final booking = bookings[index - 1];
+            final statusColor = _getBookingStatusColor(booking.status);
+            final statusIcon = _getBookingStatusIcon(booking.status);
+
+            return Card(
+              color: Colors.white,
+              margin: const EdgeInsets.symmetric(
+                vertical: AppConstants.paddingSmall,
+              ),
+              child: ListTile(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => RideDetailPage(
+                        rideId: booking.rideId,
+                      ),
+                    ),
+                  );
+                },
+                leading: Icon(
+                  Icons.bookmark,
+                  color: AppConstants.primaryColor,
+                ),
+                title: Text(
+                  booking.pickupLocation ?? 'Pickup',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          statusIcon,
+                          size: 14,
+                          color: statusColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          booking.status.replaceAll('_', ' ').toUpperCase(),
+                          style: TextStyle(
+                            fontSize: AppConstants.fontSizeSmall,
+                            color: statusColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (booking.isApproved)
+                          Padding(
+                            padding:
+                                const EdgeInsets.only(left: AppConstants.paddingSmall),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade100,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'Approved',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.event_seat,
+                          size: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${booking.seatsBooked} seat(s)',
+                          style: TextStyle(
+                            fontSize: AppConstants.fontSizeSmall,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(
+                          Icons.currency_rupee,
+                          size: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '₹${booking.totalPrice.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: AppConstants.fontSizeSmall,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                trailing: const Icon(Icons.chevron_right),
+              ),
+            );
+          },
         );
       },
     );
+  }
+
+  Color _getBookingStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange;
+      case 'approved':
+        return Colors.green;
+      case 'rejected':
+        return Colors.red;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getBookingStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Icons.schedule;
+      case 'approved':
+        return Icons.check_circle;
+      case 'rejected':
+        return Icons.cancel;
+      case 'cancelled':
+        return Icons.cancel;
+      default:
+        return Icons.info;
+    }
   }
 }
 
