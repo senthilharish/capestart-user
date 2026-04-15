@@ -138,13 +138,6 @@ class _RideDetailPageState extends State<RideDetailPage> {
                   // Ride information
                   _buildSectionTitle('Ride Information'),
                   const SizedBox(height: AppConstants.paddingMedium),
-                  _buildInfoGrid([
-                    _InfoItem('Status', ride.status.toUpperCase()),
-                    if (ride.distance != null)
-                      _InfoItem('Distance', ride.distance ?? 'N/A'),
-                    if (ride.rideDuration != null)
-                      _InfoItem('Duration', ride.rideDuration ?? 'N/A'),
-                  ]),
                   const SizedBox(height: AppConstants.paddingLarge * 2),
 
                   // Price breakdown
