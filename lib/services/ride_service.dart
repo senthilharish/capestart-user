@@ -117,14 +117,19 @@ class RideService {
   // Update passenger count (increment/decrement)
   Future<void> updatePassengerCount(String rideId, int seatCount) async {
     try {
+      print('DEBUG: Updating passenger count for ride $rideId by $seatCount seats');
+      
       await _firestore
           .collection(_ridesCollection)
           .doc(rideId)
           .update({
             'numberOfPassengers': FieldValue.increment(seatCount),
           });
+      
+      print('DEBUG: Passenger count updated successfully for ride $rideId');
     } catch (e) {
-      throw 'Failed to update passenger count: ${e.toString()}';
+      print('ERROR: Failed to update passenger count: $e');
+      throw Exception('Failed to update passenger count: $e');
     }
   }
 

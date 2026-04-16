@@ -1,0 +1,69 @@
+# 🔨 Quick Build Reference Card
+
+## The Problem ❌
+```
+Out of memory error during APK build
+Exit Code: -1073740791
+```
+
+## The Solution ✅
+Memory increased from 4GB → **8GB** in gradle.properties
+
+## Build Now! 🚀
+
+### Fastest Way
+```cmd
+build_apk.bat
+```
+
+### Manual Way
+```bash
+flutter clean
+flutter pub get
+flutter build apk --split-per-abi --release
+```
+
+## What Happens?
+✅ Creates 2 APKs (smaller, optimized for each architecture)
+✅ Uses much less memory during build
+✅ Completes in ~5-15 minutes (depending on hardware)
+✅ Outputs to: `build/app/outputs/flutter-apk/`
+
+## APK Files Created
+- `app-arm64-v8a-release.apk` ← Use this (64-bit, most devices)
+- `app-armeabi-v7a-release.apk` ← Legacy support (32-bit)
+
+## Install on Device
+```bash
+adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+```
+
+## Files Changed
+✅ `android/gradle.properties` - Increased memory to 8GB
+
+## Key Settings
+```properties
+JVM Memory: 8GB (was 4GB)
+Metaspace: 3GB (was 2GB)
+Gradle Optimization: Enabled
+```
+
+## What if it still fails?
+1. Close other apps (free up RAM)
+2. Increase to 10GB in gradle.properties:
+   ```properties
+   org.gradle.jvmargs=-Xmx10G -XX:MaxMetaspaceSize=4G
+   ```
+3. Restart computer
+4. Ensure 15GB free disk space
+
+## Verify Success
+```bash
+# Files should exist:
+# ✅ build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+# ✅ build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+```
+
+---
+
+**Ready?** → Run `build_apk.bat` or use manual commands above!

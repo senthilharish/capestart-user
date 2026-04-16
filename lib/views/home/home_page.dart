@@ -16,10 +16,10 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
-  late final List<Widget> _screens = const [
-    HomeScreen(),
-    MyRidesScreen(),
-    ProfileScreen(),
+  late final List<Widget> _screens = [
+    const HomeScreen(),
+    const MyRidesScreen(),
+    const ProfileScreen(),
   ];
 
   static const List<String> _titles = [
@@ -46,6 +46,20 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  void _refreshCurrentScreen() {
+    if (_selectedIndex == 0) {
+      // Refresh home screen rides
+      context.read<RideController>().fetchAllRides();
+    } else if (_selectedIndex == 1) {
+      // Refresh my rides bookings
+      final authController = context.read<AuthController>();
+      final currentUser = authController.currentUser;
+      if (currentUser != null) {
+        context.read<BookingController>().fetchUserBookings(currentUser.uid);
+      }
+    }
   }
 
   void _handleLogout(BuildContext context, AuthController authController) {
@@ -82,6 +96,11 @@ class _HomePageState extends State<HomePage> {
         title: Text(_titles[_selectedIndex]),
         elevation: 0,
         actions: [
+          if (_selectedIndex == 0 || _selectedIndex == 1)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _refreshCurrentScreen,
+            ),
           if (_selectedIndex == 2)
             IconButton(
               icon: const Icon(Icons.logout),
@@ -214,10 +233,14 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(AppConstants.paddingMedium),
-          itemCount: filteredRides.length + 1,
-          itemBuilder: (context, index) {
+        return RefreshIndicator(
+          onRefresh: () async {
+            await rideController.fetchAllRides();
+          },
+          child: ListView.builder(
+            padding: const EdgeInsets.all(AppConstants.paddingMedium),
+            itemCount: filteredRides.length + 1,
+            itemBuilder: (context, index) {
             if (index == 0) {
               return Container(
                 margin:
@@ -352,6 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             );
           },
+          ),
         );
       },
     );
@@ -517,10 +541,14 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(AppConstants.paddingMedium),
-          itemCount: bookings.length + 1,
-          itemBuilder: (context, index) {
+        return RefreshIndicator(
+          onRefresh: () async {
+            await bookingController.fetchUserBookings(currentUser.uid);
+          },
+          child: ListView.builder(
+            padding: const EdgeInsets.all(AppConstants.paddingMedium),
+            itemCount: bookings.length + 1,
+            itemBuilder: (context, index) {
             if (index == 0) {
               return Container(
                 margin:
@@ -657,6 +685,7 @@ class _MyRidesScreenState extends State<MyRidesScreen> {
               ),
             );
           },
+          ),
         );
       },
     );

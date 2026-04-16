@@ -470,50 +470,6 @@ class _RideDetailPageState extends State<RideDetailPage> {
     );
   }
 
-  Widget _buildInfoGrid(List<_InfoItem> items) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: AppConstants.paddingMedium,
-      mainAxisSpacing: AppConstants.paddingMedium,
-      children: items
-          .map((item) => Container(
-                padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius:
-                      BorderRadius.circular(AppConstants.borderRadiusMedium),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      item.label,
-                      style: TextStyle(
-                        fontSize: AppConstants.fontSizeSmall,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      item.value,
-                      style: const TextStyle(
-                        fontSize: AppConstants.fontSizeMedium,
-                        fontWeight: FontWeight.bold,
-                        color: AppConstants.textColor,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ))
-          .toList(),
-    );
-  }
-
   Widget _buildPriceItem(String label, double amount, {bool isTotal = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -969,41 +925,63 @@ class _RideDetailPageState extends State<RideDetailPage> {
     int seatsToBook,
     double pricePerSeat,
   ) async {
-    final authController = context.read<AuthController>();
-    final bookingController = context.read<BookingController>();
-    final currentUser = authController.currentUser;
+    try {
+      final authController = context.read<AuthController>();
+      final bookingController = context.read<BookingController>();
+      final currentUser = authController.currentUser;
 
-    if (currentUser == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User not logged in')),
-        );
+      if (currentUser == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('User not logged in')),
+          );
+        }
+        return;
       }
-      return;
-    }
 
-    final result = await bookingController.createBooking(
-      currentUser.uid,
-      rideId,
-      _rideController.selectedRide?.driverId ?? '',
-      seatsToBook,
-      pricePerSeat,
-      _rideController.selectedRide?.startAddress,
-      _rideController.selectedRide?.destinationAddress,
-    );
+      print('DEBUG: Starting booking process - userId: ${currentUser.uid}, rideId: $rideId, seats: $seatsToBook');
 
-    if (mounted) {
+      final result = await bookingController.createBooking(
+        currentUser.uid,
+        rideId,
+        _rideController.selectedRide?.driverId ?? '',
+        seatsToBook,
+        pricePerSeat,
+        _rideController.selectedRide?.startAddress,
+        _rideController.selectedRide?.destinationAddress,
+      );
+
+      if (!mounted) return;
+
       if (result != null) {
+        print('DEBUG: Booking successful - bookingId: ${result.bookingId}');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Seat booked successfully! Waiting for driver approval.'),
             duration: Duration(seconds: 2),
           ),
         );
+        // Refresh rides list after booking
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            _rideController.fetchAllRides();
+          }
+        });
       } else {
+        print('DEBUG: Booking failed - error: ${bookingController.errorMessage}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to book seat: ${bookingController.errorMessage}'),
+            backgroundColor: AppConstants.errorColor,
+          ),
+        );
+      }
+    } catch (e) {
+      print('ERROR: Exception in _bookSeat: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('An error occurred: $e'),
             backgroundColor: AppConstants.errorColor,
           ),
         );
@@ -1033,11 +1011,4 @@ class _RideDetailPageState extends State<RideDetailPage> {
       ),
     );
   }
-}
-
-class _InfoItem {
-  final String label;
-  final String value;
-
-  _InfoItem(this.label, this.value);
 }

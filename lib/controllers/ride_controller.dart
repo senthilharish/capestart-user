@@ -23,13 +23,14 @@ class RideController extends ChangeNotifier {
 
   // Fetch all rides
   Future<void> fetchAllRides() async {
-    _setLoading(true);
-    _errorMessage = '';
-
     try {
+      _setLoading(true);
+      _errorMessage = '';
       _rides = await _rideService.getAllRides();
+      _errorMessage = '';
       _setLoading(false);
     } catch (e) {
+      print('ERROR: Failed to fetch all rides: $e');
       _errorMessage = e.toString();
       _setLoading(false);
     }

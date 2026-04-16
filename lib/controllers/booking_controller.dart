@@ -28,10 +28,10 @@ class BookingController extends ChangeNotifier {
     String? pickupLocation,
     String? dropoffLocation,
   ) async {
-    _setLoading(true);
-    _errorMessage = '';
-
     try {
+      _setLoading(true);
+      _errorMessage = '';
+
       final totalPrice = seatsBooked * pricePerSeat;
 
       final booking = BookingModel(
@@ -49,22 +49,31 @@ class BookingController extends ChangeNotifier {
         dropoffLocation: dropoffLocation,
       );
 
+      print('DEBUG: Creating booking with details: userId=$userId, rideId=$rideId, seats=$seatsBooked');
+
       final createdBooking = await _bookingService.createBooking(booking);
+
+      print('DEBUG: Booking created successfully: ${createdBooking.bookingId}');
       
       // Update the ride's passenger count
       try {
         await _rideService.updatePassengerCount(rideId, seatsBooked);
+        print('DEBUG: Passenger count updated for ride $rideId');
       } catch (e) {
         print('Warning: Failed to update passenger count: $e');
         // Don't fail the booking if passenger count update fails
       }
       
       _selectedBooking = createdBooking;
+      _errorMessage = '';
       _setLoading(false);
+      notifyListeners();
       return createdBooking;
     } catch (e) {
-      _errorMessage = e.toString();
+      print('ERROR: Exception during booking creation: $e');
+      _errorMessage = 'Booking failed: ${e.toString()}';
       _setLoading(false);
+      notifyListeners();
       return null;
     }
   }

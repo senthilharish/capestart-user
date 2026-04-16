@@ -18,9 +18,15 @@ class BookingService {
       final docRef = _firestore.collection('bookings').doc();
       final bookingWithId = booking.copyWith(bookingId: docRef.id);
 
+      print('DEBUG: Writing booking to Firestore - id: ${docRef.id}');
+      print('DEBUG: Booking data: userId=${bookingWithId.userId}, rideId=${bookingWithId.rideId}, seatsBooked=${bookingWithId.seatsBooked}');
+
       await docRef.set(bookingWithId.toJson());
+      
+      print('DEBUG: Booking successfully written to Firestore');
       return bookingWithId;
     } catch (e) {
+      print('ERROR: Failed to create booking: $e');
       throw Exception('Failed to create booking: $e');
     }
   }
